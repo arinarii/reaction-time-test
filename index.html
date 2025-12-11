@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Reaction Time Test</title>
+<style>
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: #111;
+    color: white;
+    font-family: Arial, sans-serif;
+  }
+  #box {
+    width: 300px;
+    height: 200px;
+    background: #550000; /* dark red */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 12px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 24px;
+  }
+</style>
+</head>
+<body>
+
+<div id="box">Start</div>
+<audio id="beep" src="soundEffect.mp3"></audio>
+
+<script>
+let box = document.getElementById("box");
+let beep = document.getElementById("beep");
+
+let running = false;
+let waitingForGreen = false;
+let holding = false;
+let iteration = 0;
+let times = [];
+let startTime = 0;
+
+box.addEventListener("mousedown", () => {
+  if (!running) {
+    startTest();
+    return;
+  }
+
+  if (waitingForGreen) {
+    showError("Early Release! Restarting iteration...");
+    resetIteration();
+  } else {
+    holding = true;
+  }
+});
+
+box.addEventListener("mouseup", () => {
+  if (!running) return;
+  if (!waitingForGreen && startTime > 0) {
+    let rt = performance.now() - startTime;
+    times.push(rt);
+    nextIteration();
+  }
+});
+
+box.addEventListener("mouseleave", () => {
+  if (holding) {
+    showError("Mouse left the area! Restarting iteration...");
+    resetIteration();
+  }
+});
+
+function startTest() {
+  running = true;
+  iteration = 0;
+  times = [];
+  box.textContent = "Hold...";
+  startIteration();
+}
+
+function startIteration() {
+  holding = false;
+  waitingForGreen = true;
+  box.style.background = "#550000"; // dark red
+  box.textContent = "Hold still...";
+
+  let delay = Math.random() * 6000 + 1000; // 1s to 7s
+
+  setTimeout(() => {
+    // turn green
+    if (!running) return;
+    waitingForGreen = false;
+    box.style.background = "green";
+    box.textContent = "Release!";
+    beep.play();
+    startTime = performance.now();
+  }, delay);
+}
+
+function resetIteration() {
+  holding = false;
+  waitingForGreen = false;
+  startTime = 0;
+  setTimeout(startIteration, 800);
+}
+
+function nextIteration() {
+  iteration++;
+  if (iteration >= 10) {
+    finishTest();
+  } else {
+    box.style.background = "#222";
+    box.textContent = "Next...";
+    startTime = 0;
+    holding = false;
+    waitingForGreen = false;
+    setTimeout(startIteration, 900);
+  }
+}
+
+function finishTest() {
+  running = false;
+  let avg = times.reduce((a,b)=>a+b,0) / times.length;
+  box.style.background = "#444";
+  box.textContent = `Avg: ${avg.toFixed(2)} ms`;
+}
+
+function showError(msg) {
+  box.style.background = "#880000";
+  box.textContent = msg;
+}
+</script>
+</body>
+</html>
