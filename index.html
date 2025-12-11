@@ -365,4 +365,33 @@
     resetVars();
     trialIndex = 0;
     successfulTimes = [];
-    resultsEl.style
+    resultsEl.style.display = 'none';
+    setMessage('');
+    setRectState('disabled','Start');
+    startBtn.disabled = false;
+    setStatus('Ready');
+    updateTrialCounter();
+  });
+
+  // Prevent text selection while interacting
+  rect.addEventListener('dragstart', e => e.preventDefault());
+
+  // initial UI
+  setRectState('disabled','Start');
+  setStatus('Ready');
+  updateTrialCounter();
+
+  // keyboard accessibility: pressing Space or Enter on rect simulates pointerdown for convenience
+  rect.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      // create a fake pointerdown-like event with pointerId = -1
+      const fake = new PointerEvent('pointerdown', { bubbles: true, clientX: rect.getBoundingClientRect().left + 10, clientY: rect.getBoundingClientRect().top + 10, pointerId: -1 });
+      rect.dispatchEvent(fake);
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
