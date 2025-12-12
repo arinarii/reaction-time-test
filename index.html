@@ -113,20 +113,13 @@
 
   let trialIndex = 0;
   let successfulTimes = [];
-
-  let state = 'idle';  
+  let state = 'idle'; // 'idle', 'waitingForHold', 'holding', 'green', 'showingResult'
   let waitTimer = null;
   let timeGreen = 0;
   let activePointerId = null;
   let initialPointerPos = null;
+  const MOVE_TOLERANCE = 8; // pixels allowed (small movement allowed)
   let pointerInside = false;
-
-  const MOVE_TOLERANCE = 8;
-
-  // New: For letter requirement
-  let requiredLetter = null;
-  let letterPressed = false;
-  let mouseReleased = false;
 
   function resetVars() {
     clearTimeout(waitTimer);
@@ -135,13 +128,11 @@
     activePointerId = null;
     initialPointerPos = null;
     pointerInside = false;
-
-    requiredLetter = null;
-    letterPressed = false;
-    mouseReleased = false;
   }
 
-  function setStatus(txt) { statusEl.textContent = txt; }
+  function setStatus(txt) {
+    statusEl.textContent = txt;
+  }
   function setMessage(txt, color = '') {
     messageEl.textContent = txt;
     messageEl.style.color = color || '';
@@ -152,232 +143,225 @@
 
   function setRectState(kind, text = '') {
     rect.classList.remove('red','green','disabled');
-
     if (kind === 'red') {
       rect.classList.add('red');
       rect.textContent = text || 'Hold';
+      rect.setAttribute('aria-label','Hold inside until it turns green');
     } else if (kind === 'green') {
       rect.classList.add('green');
-      rect.textContent = text;
+      rect.textContent = text || 'Release!';
+      rect.setAttribute('aria-label','Release now');
     } else {
       rect.classList.add('disabled');
       rect.textContent = text || 'Start';
+      rect.setAttribute('aria-label','Start');
     }
   }
 
   function randomDelayMs() {
+    // random in [1000, 7000]
     return Math.floor(1000 + Math.random() * 6000);
   }
 
   function beginTest() {
+    // initialize
     trialIndex = 0;
     successfulTimes = [];
     resultsEl.style.display = 'none';
     startBtn.disabled = true;
     setMessage('');
     updateTrialCounter();
-    setStatus('Test started — hold until green');
+    setStatus('Test started — press & hold inside the rectangle when it turns red');
     nextTrial();
   }
 
   function finishTest() {
     startBtn.disabled = false;
     setStatus('Test complete');
-
+    // show results
     resultsEl.style.display = 'block';
     timesList.innerHTML = '';
-    successfulTimes.forEach((t,i)=>{
+    successfulTimes.forEach((t, i) => {
       const pill = document.createElement('div');
       pill.className = 'time-pill';
       pill.textContent = `#${i+1}: ${t.toFixed(0)} ms`;
       timesList.appendChild(pill);
     });
-
     const avg = successfulTimes.reduce((a,b)=>a+b,0) / successfulTimes.length;
     avgEl.textContent = `Average: ${avg.toFixed(0)} ms (${successfulTimes.length} trials)`;
   }
 
   function nextTrial() {
     resetVars();
-
     if (trialIndex >= TRIALS) {
       finishTest();
       return;
     }
-
+    // Prepare rectangle as dark red and await pointerdown from user
     state = 'waitingForHold';
-    setRectState('red','Hold');
-    setStatus(`Trial ${trialIndex+1} — Hold inside the rectangle`);
+    setRectState('red', 'Hold');
+    setStatus(`Trial ${trialIndex + 1} — press & hold inside the red rectangle`);
     updateTrialCounter();
-    setMessage('Hold and keep still.');
+    setMessage('Press and keep holding inside the rectangle. If you release or move too much, it will reset this trial.', '#444');
   }
 
-  // --------------------------
-  // HOLD START
-  // --------------------------
+  // Called when a valid pointerdown occurs inside rect in waitingForHold state
   function onHoldStart(evt) {
     if (state !== 'waitingForHold') return;
-
-    try { rect.setPointerCapture(evt.pointerId); } catch(e){}
+    // Capture pointer
+    try { rect.setPointerCapture(evt.pointerId); } catch(e){/*ignore*/}
 
     activePointerId = evt.pointerId;
     pointerInside = true;
     initialPointerPos = { x: evt.clientX, y: evt.clientY };
-
     state = 'holding';
     setStatus('Waiting for green...');
     setMessage('');
-
+    // set timer to turn green after random delay
     const delay = randomDelayMs();
     waitTimer = setTimeout(() => {
-      if (state !== 'holding' || !pointerInside) return;
-
-      // ------------------------------
-      // SWITCH TO GREEN + LETTER
-      // ------------------------------
+      // Only succeed if still holding and pointer hasn't moved outside tolerance
+      if (state !== 'holding' || !pointerInside) {
+        // if not holding anymore, early release has been dealt with already
+        return;
+      }
+      // change to green
       state = 'green';
       timeGreen = performance.now();
-
-      requiredLetter = Math.random() < 0.5 ? 'A' : 'D';
-      setRectState('green', requiredLetter);
-
-      setStatus(`Green! Release AND press "${requiredLetter}"`);
-      setMessage(`Press ${requiredLetter} and release the mouse.`);
-
-      try { sound.currentTime = 0; sound.play().catch(()=>{}); } catch(e){}
+      setRectState('green','Release!');
+      setStatus('Green! Release now');
+      // Play sound (best-effort — may be blocked until user interacted; pointerdown counts as interaction)
+      try { sound.currentTime = 0; sound.play().catch(()=>{}); } catch(e) {}
     }, delay);
   }
 
-  // --------------------------
-  // POINTER MOVE CHECK
-  // --------------------------
   function onPointerMove(evt) {
     if (!activePointerId || evt.pointerId !== activePointerId) return;
     if (state === 'idle' || state === 'showingResult') return;
 
-    const box = rect.getBoundingClientRect();
-    const inside =
-      evt.clientX >= box.left && evt.clientX <= box.right &&
-      evt.clientY >= box.top  && evt.clientY <= box.bottom;
-
-    if (initialPointerPos &&
-        Math.hypot(evt.clientX - initialPointerPos.x, evt.clientY - initialPointerPos.y) > MOVE_TOLERANCE) {
-      handleEarlyRelease('Moved too much');
+    // detect leaving the rectangle bounds
+    const rectBox = rect.getBoundingClientRect();
+    const inside = (evt.clientX >= rectBox.left && evt.clientX <= rectBox.right &&
+                    evt.clientY >= rectBox.top  && evt.clientY <= rectBox.bottom);
+    // movement tolerance check
+    if (initialPointerPos && (Math.hypot(evt.clientX - initialPointerPos.x, evt.clientY - initialPointerPos.y) > MOVE_TOLERANCE)) {
+      // movement too large => early release
+      handleEarlyRelease('moved too much (early release)');
       return;
     }
-
+    // leaving rectangle counts as release (per spec)
     if (!inside && pointerInside) {
+      // treat as release event
       pointerInside = false;
-      handlePointerUp(evt, true);
+      // trigger pointerup-equivalent
+      handlePointerUp(evt, /*leftRect=*/true);
     } else {
       pointerInside = inside;
     }
   }
 
-  // --------------------------
-  // EARLY RELEASE
-  // --------------------------
-  function handleEarlyRelease(reason) {
+  function handleEarlyRelease(reason = 'Early release') {
+    // if we were green, that is a release; but this function is invoked when releasing before green or moving too much before green
     clearTimeout(waitTimer);
     waitTimer = null;
-
+    // Provide feedback and reset this iteration (do NOT increment trialIndex)
     state = 'waitingForHold';
     setRectState('red','Hold');
     setStatus('Early release — try again');
-    setMessage(`${reason}. Trial reset.`, '#b00020');
-
+    setMessage(reason + '. This trial has been reset.', '#b00020');
+    // release pointer capture if held
     try { rect.releasePointerCapture(activePointerId); } catch(e){}
     activePointerId = null;
     initialPointerPos = null;
     pointerInside = false;
-
-    letterPressed = false;
-    mouseReleased = false;
   }
 
-  // --------------------------
-  // POINTER UP
-  // --------------------------
-  function handlePointerUp(evt) {
+  function handlePointerUp(evt, leftRect = false) {
+    // Only proceed if we are tracking the pointer
     if (!activePointerId || evt.pointerId !== activePointerId) return;
 
+    // If pointerup happens while waiting (before green): early release -> reset iteration
     if (state === 'holding') {
-      handleEarlyRelease('Released before green');
+      // early release
+      handleEarlyRelease('Released before green (early release)');
+      return;
+    }
+
+    if (state === 'waitingForHold') {
+      // pointerup with no active hold — ignore
       return;
     }
 
     if (state === 'green') {
-      mouseReleased = true;
+      // This is the normal path: compute reaction time
+      const releasedAt = performance.now();
+      const reaction = releasedAt - timeGreen;
+      successfulTimes.push(reaction);
+      trialIndex += 1;
+      updateTrialCounter();
+      setMessage(`Good! Reaction: ${reaction.toFixed(0)} ms`, '#0a6d16');
+      setStatus(`Recorded ${successfulTimes.length} / ${TRIALS}`);
+      // prepare for next trial after a brief pause so user can see result
+      state = 'showingResult';
+      setRectState('disabled','Saved');
+      // clear sound timer if any
+      clearTimeout(waitTimer); waitTimer = null;
       try { rect.releasePointerCapture(activePointerId); } catch(e){}
       activePointerId = null;
-      checkFinishConditions();
+      initialPointerPos = null;
+      pointerInside = false;
+      // brief inter-trial pause
+      setTimeout(() => {
+        nextTrial();
+      }, 800);
       return;
     }
+
+    // other states -> ignore
   }
 
-  // --------------------------
-  // FINISH CHECK
-  // --------------------------
-  function checkFinishConditions() {
-    if (!letterPressed || !mouseReleased) return;
-
-    const releasedAt = performance.now();
-    const reaction = releasedAt - timeGreen;
-
-    successfulTimes.push(reaction);
-    trialIndex += 1;
-
-    setMessage(`Good! Reaction: ${reaction.toFixed(0)} ms`, '#0a6d16');
-    setStatus(`Recorded ${successfulTimes.length}/${TRIALS}`);
-
-    state = 'showingResult';
-    setRectState('disabled','Saved');
-
-    setTimeout(nextTrial, 800);
-  }
-
-  // --------------------------
-  // KEY HANDLING
-  // --------------------------
-  window.addEventListener('keydown', (e) => {
-    if (state !== 'green') return;
-    if (!requiredLetter) return;
-
-    const pressed = e.key.toUpperCase();
-    if (pressed === requiredLetter) {
-      letterPressed = true;
-      checkFinishConditions();
-    }
-  });
-
-  // pointer cancel
+  // Pointer cancel (e.g., OS interrupts) -> treat as early release if before green
   function onPointerCancel(evt) {
     if (!activePointerId || evt.pointerId !== activePointerId) return;
-
     if (state === 'holding') {
-      handleEarlyRelease('Pointer cancelled');
+      handleEarlyRelease('Pointer cancelled (treated as early release)');
     } else if (state === 'green') {
-      mouseReleased = true;
-      checkFinishConditions();
+      // treat as release
+      handlePointerUp(evt);
     } else {
       resetVars();
     }
   }
 
-  // EVENT BINDINGS
-  rect.addEventListener('pointerdown', (e)=>{
-    if (e.button !== 0) return;
+  // Attach pointer handlers
+  rect.addEventListener('pointerdown', (e) => {
+    // only accept primary button (touch counts as primary)
+    if (e.button && e.button !== 0) return;
+    // start only if waitingForHold
     onHoldStart(e);
   });
 
   rect.addEventListener('pointermove', onPointerMove);
-  rect.addEventListener('pointerup',  handlePointerUp);
-  rect.addEventListener('pointerleave', handlePointerUp);
+  rect.addEventListener('pointerup', (e) => handlePointerUp(e, false));
+  rect.addEventListener('pointerleave', (e) => {
+    // leaving while holding before green counts as release -> we handle in pointermove but also ensure it's covered
+    if (activePointerId && e.pointerId === activePointerId) {
+      // treat as pointer up / release
+      handlePointerUp(e, true);
+    }
+  });
   rect.addEventListener('pointercancel', onPointerCancel);
 
-  startBtn.addEventListener('click', beginTest);
+  // Start / restart controls
+  startBtn.addEventListener('click', () => {
+    startBtn.disabled = true;
+    resultsEl.style.display = 'none';
+    setRectState('red','Hold');
+    beginTest();
+  });
 
   restartBtn.addEventListener('click', () => {
+    // hard restart
     resetVars();
     trialIndex = 0;
     successfulTimes = [];
@@ -389,14 +373,25 @@
     updateTrialCounter();
   });
 
+  // Prevent text selection while interacting
   rect.addEventListener('dragstart', e => e.preventDefault());
 
-  // init
+  // initial UI
   setRectState('disabled','Start');
   setStatus('Ready');
   updateTrialCounter();
+
+  // keyboard accessibility: pressing Space or Enter on rect simulates pointerdown for convenience
+  rect.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      // create a fake pointerdown-like event with pointerId = -1
+      const fake = new PointerEvent('pointerdown', { bubbles: true, clientX: rect.getBoundingClientRect().left + 10, clientY: rect.getBoundingClientRect().top + 10, pointerId: -1 });
+      rect.dispatchEvent(fake);
+    }
+  });
+
 })();
 </script>
-
 </body>
 </html>
