@@ -91,6 +91,26 @@
 .fail{
     color:#ff6060;
 }
+
+    .feedback-title{
+    text-align:center;
+    font-size:34px;
+    font-weight:bold;
+    margin-bottom:4px;
+}
+
+.feedback-result{
+    text-align:center;
+    font-size:24px;
+    font-weight:bold;
+    margin-bottom:18px;
+}
+
+.feedback-info{
+    text-align:left;
+    font-size:18px;
+    line-height:1.35;
+}
 </style>
 </head>
 
@@ -241,12 +261,11 @@ box.onpointerdown = ()=>{
 
         box.textContent = "reaction time test w/ sfx";
 
-        feedback.innerHTML =
-        `
-        <b style="color:#ff6666;">TOO EARLY</b>
-        
-        Wait until the sound plays.
-        `;
+        feedback.innerHTML = `
+<div class="fail">
+    <div class="feedback-result">TOO EARLY</div>
+    <div class="feedback-info">Wait until the sound plays.</div>
+</div>`;
         return;
     }
 
@@ -270,42 +289,27 @@ box.onpointerdown = ()=>{
         if(success){
 
             box.textContent = "Click to Start";
-            feedback.innerHTML =
-            `
-            <div class="pass">
-            
-            <b>${reaction.toFixed(0)} ms</b>
-            
-            PASS
-            
-            ${currentAttack.spiker}${technique}
-            Height ${currentAttack.height}
-            
-            Target: under ${threshold} ms
-            
-            </div>
-            `;
+            feedback.innerHTML = `
+<div class="pass">
+    <div class="feedback-title">${reaction.toFixed(0)} ms</div>
+    <div class="feedback-result">PASS</div>
+    <div class="feedback-info">Spiker: ${currentAttack.spiker}${technique}<br>Height: ${currentAttack.height}<br>Target: Under ${threshold} ms</div>
+</div>`;
 
         }else{
 
             box.textContent = "Click to Start";
 
-            feedback.innerHTML =
-            `
+           feedback.innerHTML = `
             <div class="fail">
-            
-            <b>${reaction.toFixed(0)} ms</b>
-            
-            FAIL
-            
-            ${currentAttack.spiker}${technique}
-            Height ${currentAttack.height}
-            
-            Should've been earlier than
-            ${threshold} ms
-            
+            <div class="feedback-title">${reaction.toFixed(0)} ms</div>
+            <div class="feedback-result">FAIL</div>
+        
+            <div class="feedback-info">Spiker: ${currentAttack.spiker}${technique}
+            <br>Height: ${currentAttack.height}
+            <br>Should've been earlier than ${threshold} ms
             </div>
-            `;
+        </div>`;
         }
     }
 };
