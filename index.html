@@ -95,6 +95,7 @@ let currentAttack = null;
 
 // preload sound
 const hitSound = new Audio("soundEffect.mp3");
+hitSound.volume = 0.5; // 20% volume
 hitSound.preload = "auto";
 
 function randomAttack(){
