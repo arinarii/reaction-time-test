@@ -43,15 +43,70 @@
     .ready{
         background:#00c853;
     }
+
+    #container{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+    align-items:center;
+}
+
+#feedback{
+
+    width:420px;
+    min-height:120px;
+
+    background:#1b1b1b;
+
+    border-radius:12px;
+
+    border:1px solid #333;
+
+    color:white;
+
+    box-sizing:border-box;
+
+    padding:18px;
+
+    line-height:1.6;
+
+    font-size:20px;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    text-align:center;
+
+    white-space:pre-line;
+}
+
+.pass{
+    color:#35ff79;
+}
+
+.fail{
+    color:#ff6060;
+}
 </style>
 </head>
 
 <body>
 
-<div id="box" class="idle">reaction time test w/ sfx</div>
+<div id="container">
+
+    <div id="box" class="idle">
+        reaction time test w/ sfx
+    </div>
+
+    <div id="feedback">
+        Click the box to begin.
+    </div>
+
+</div>
 
 <script>
 const box = document.getElementById("box");
+const feedback = document.getElementById("feedback");
 
 // ==========================
 // EDIT EVERYTHING HERE
@@ -179,7 +234,15 @@ box.onpointerdown = ()=>{
         waiting = false;
 
         box.className = "idle";
-        box.textContent = "TOO EARLY";
+
+        //box.textContent = "reaction time test w/ sfx";
+
+        feedback.innerHTML =
+        `
+        <b style="color:#ff6666;">TOO EARLY</b>
+        
+        Wait until the sound plays.
+        `;
         return;
     }
 
@@ -202,20 +265,43 @@ box.onpointerdown = ()=>{
 
         if(success){
 
-            box.innerHTML =
-            `${reaction.toFixed(0)} ms<br>
-            PASS<br>
-            ${currentAttack.spiker}${technique}<br>
-            ${currentAttack.height} Height`;
+            box.textContent = "Click to Start";
+            feedback.innerHTML =
+            `
+            <div class="pass">
+            
+            <b>${reaction.toFixed(0)} ms</b>
+            
+            PASS
+            
+            ${currentAttack.spiker}${technique}
+            Height ${currentAttack.height}
+            
+            Target: under ${threshold} ms
+            
+            </div>
+            `;
 
         }else{
 
-            box.innerHTML =
-            `${reaction.toFixed(0)} ms<br>
-            FAIL<br>
-            ${currentAttack.spiker}${technique}<br>
-            ${currentAttack.height} Height<br>
-            Should've been earlier than ${threshold} ms`;
+            box.textContent = "Click to Start";
+
+            feedback.innerHTML =
+            `
+            <div class="fail">
+            
+            <b>${reaction.toFixed(0)} ms</b>
+            
+            FAIL
+            
+            ${currentAttack.spiker}${technique}
+            Height ${currentAttack.height}
+            
+            Should've been earlier than
+            ${threshold} ms
+            
+            </div>
+            `;
         }
     }
 };
