@@ -286,7 +286,7 @@ box.onpointerdown = ()=>{
 
         box.className = "idle";
 
-        const threshold = currentAttack.timing;
+        const threshold = currentAttack.timing - 32;
 
         const success = reaction < threshold;
 
