@@ -53,12 +53,87 @@
 <script>
 const box = document.getElementById("box");
 
+// ==========================
+// EDIT EVERYTHING HERE
+// ==========================
+
+const SPIKERS = {
+    Tsh: {
+        NoTilt: {
+            15: 300,
+            12: 266
+        }
+    },
+
+    Akari: {
+        Wtilt: {
+            15: 266,
+            12: 216
+        }
+    },
+
+    Yogan: {
+        Wtilt: {
+            15: 300
+        },
+        WAtilt: {
+            12: 266
+        }
+    }
+};
+
+// ==========================
+
+const heights = [12, 15];
+
 let startTime = 0;
 let waiting = false;
 let ready = false;
 let timer = 0;
 
-function start() {
+let currentAttack = null;
+
+// preload sound
+const hitSound = new Audio("soundEffect.mp3");
+hitSound.preload = "auto";
+
+function randomAttack(){
+
+    const spikers = Object.keys(SPIKERS);
+
+    while(true){
+
+        const spiker =
+            spikers[Math.floor(Math.random()*spikers.length)];
+
+        const techniques =
+            Object.keys(SPIKERS[spiker]);
+
+        const technique =
+            techniques[Math.floor(Math.random()*techniques.length)];
+
+        const height =
+            heights[Math.floor(Math.random()*heights.length)];
+
+        const timing =
+            SPIKERS[spiker][technique][height];
+
+        // retry if this combo doesn't exist
+        if(timing !== undefined){
+
+            return {
+                spiker,
+                technique,
+                height,
+                timing
+            };
+        }
+    }
+}
+
+function start(){
+
+    currentAttack = randomAttack();
 
     waiting = true;
     ready = false;
@@ -66,29 +141,38 @@ function start() {
     box.className = "waiting";
     box.textContent = "WAIT...";
 
-    timer = setTimeout(() => {
+    timer = setTimeout(()=>{
 
         ready = true;
         waiting = false;
 
         box.className = "ready";
-        box.textContent = "CLICK";
+
+        const technique =
+            currentAttack.technique === "NoTilt"
+            ? ""
+            : ` (${currentAttack.technique})`;
+
+        box.innerHTML =
+            `${currentAttack.spiker}${technique}<br>${currentAttack.height} Height`;
+
+        hitSound.currentTime = 0;
+        hitSound.play();
 
         startTime = performance.now();
 
-    }, (Math.random() * 2000) + 500);
+    }, Math.random()*2000 + 500);
 }
 
-box.onpointerdown = () => {
+box.onpointerdown = ()=>{
 
-    // start game
     if(!waiting && !ready){
         start();
         return;
     }
 
-    // clicked too early
     if(waiting){
+
         clearTimeout(timer);
 
         waiting = false;
@@ -98,7 +182,6 @@ box.onpointerdown = () => {
         return;
     }
 
-    // successful click
     if(ready){
 
         const reaction = performance.now() - startTime;
@@ -106,7 +189,33 @@ box.onpointerdown = () => {
         ready = false;
 
         box.className = "idle";
-        box.textContent = reaction.toFixed(0) + " MS";
+
+        const threshold = currentAttack.timing - 33;
+
+        const success = reaction < threshold;
+
+        const technique =
+            currentAttack.technique === "NoTilt"
+            ? ""
+            : ` (${currentAttack.technique})`;
+
+        if(success){
+
+            box.innerHTML =
+            `${reaction.toFixed(0)} ms<br>
+            PASS<br>
+            ${currentAttack.spiker}${technique}<br>
+            ${currentAttack.height} Height`;
+
+        }else{
+
+            box.innerHTML =
+            `${reaction.toFixed(0)} ms<br>
+            FAIL<br>
+            ${currentAttack.spiker}${technique}<br>
+            ${currentAttack.height} Height<br>
+            Should've been earlier than ${threshold} ms`;
+        }
     }
 };
 </script>
